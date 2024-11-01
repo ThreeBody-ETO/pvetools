@@ -1,4 +1,4 @@
-!/bin/bash
+#!/bin/bash
 #############--Proxmox VE Tools--##########################
 #  Author : 龙天ivan
 #  Mail: ivanhao1984@qq.com
@@ -1705,8 +1705,7 @@ Sensors driver not found.
                 if [ $bver -gt 7 ];then
                     cat << EOF > /usr/bin/s.sh
 curC=\`cat /proc/cpuinfo|grep MHz|awk 'NR==1{print \$4}'\`
-max=\`cat /proc/cpuinfo|grep GHz|awk -F "@" 'NR==1{print \$2}'|sed 's/GHz//g'|sed 's/\ //g'\`
-maxC=\`echo "\$max * 1000"|bc -l\`
+maxC=\$(lscpu | grep 'max MHz' | awk '{print\$4}')
 minC=\`lscpu|grep 'min MHz'|awk '{print \$4}'\`
 c="\"CPU-MHz\":\""\$curC"\",\"CPU-max-MHz\":\""\$maxC"\",\"CPU-min-MHz\":\""\$minC"\""
 r="{"\$c"}"
@@ -1714,8 +1713,10 @@ echo \$r
 EOF
                 else
                     cat << EOF > /usr/bin/s.sh
-c=\`lscpu|grep MHz|sed 's/CPU\ /CPU-/g'|sed 's/\ MHz/-MHz/g'|sed 's/\ //g'|sed 's/^/"/g'|sed 's/$/"\,/g'|sed 's/\:/\"\:\"/g'|awk 'BEGIN{ORS=""}{print \$0}'|sed 's/\,\$//g'\`
+c=\`lscpu|grep MHz|sed 's/CPU\ /CPU-/g'|sed 's/\ MHz/-MHz/g'|sed 's/\ //g'|sed 's/^/"/g'|sed 's/$/"\,/g'|sed 's/\:/\"\:\"/g'|sed 's/(s)scaling//g'|awk 'BEGIN{ORS=""}{print \$0}'|sed 's/\,\$//g'\`
 r="{"\$c"}"
+cpufreq=\$(echo "scale=4; \$(cpufreq-info -f) / 1000" | bc -l)
+r=\$(echo "\$r" | sed 's/"CPU-MHz":"[^"]*"/"CPU-MHz":"'"\$cpufreq"'"/')
 echo \$r
 EOF
                 fi
@@ -1786,8 +1787,10 @@ EOF
             else
                 cat << EOF > /usr/bin/s.sh
 r=\`sensors|grep -E 'Package id 0|fan|Physical id 0|Core'|grep '^[a-zA-Z0-9].[[:print:]]*:.\s*\S*[0-9].\s*[A-Z].' -o|sed 's/:\ */:/g'|sed 's/:/":"/g'|sed 's/^/"/g' |sed 's/$/",/g'|sed 's/\ C\ /C/g'|sed 's/\ V\ /V/g'|sed 's/\ RP/RPM/g'|sed 's/\ //g'|awk 'BEGIN{ORS=""}{print \$0}'|sed 's/\,\$//g'|sed 's/°C/\&degC/g'\`
-c=\`lscpu|grep MHz|sed 's/CPU\ /CPU-/g'|sed 's/\ MHz/-MHz/g'|sed 's/\ //g'|sed 's/^/"/g'|sed 's/$/"\,/g'|sed 's/\:/\"\:\"/g'|awk 'BEGIN{ORS=""}{print \$0}'|sed 's/\,\$//g'\`
+c=\`lscpu|grep MHz|sed 's/CPU\ /CPU-/g'|sed 's/\ MHz/-MHz/g'|sed 's/\ //g'|sed 's/^/"/g'|sed 's/$/"\,/g'|sed 's/\:/\"\:\"/g'|sed 's/(s)scaling//g'|awk 'BEGIN{ORS=""}{print \$0}'|sed 's/\,\$//g'\`
 r="{"\$r","\$c"}"
+cpufreq=\$(echo "scale=4; \$(cpufreq-info -f) / 1000" | bc -l)
+r=\$(echo "\$r" | sed 's/"CPU-MHz":"[^"]*"/"CPU-MHz":"'"\$cpufreq"'"/')
 echo \$r
 EOF
             fi
@@ -1910,7 +1913,7 @@ No sensors found.
                 rm /usr/bin/s.sh
                 #cp /etc/pvetools/pvemanagerlib.js $js
                 #cp /etc/pvetools/Nodes.pm $pm
-                apt install --reinstall pve-manager
+                apt-get install --reinstall pve-manager -y
                 systemctl restart pveproxy
                 echo 50
                 echo 100
@@ -2686,7 +2689,7 @@ EOF
             else
                 #alpineUrl='https://mirrors.aliyun.com/alpine/v3.10/releases/x86_64'
                 #change url
-                alpineUrl='https://mirrors.ustc.edu.cn/alpine/v3.10/releases/x86_64/'
+                alpineUrl='https://mirrors.ustc.edu.cn/alpine/latest-stable/releases/x86_64/'
             fi
             version=`wget $alpineUrl/ -q -O -|grep minirootfs|grep -o '[0-9]*\.[0-9]*\.[0-9]*'|sort -u -r|awk 'NR==1{print $1}'`
             echo $alpineUrl
@@ -2708,8 +2711,8 @@ type=directory
 shell=/bin/sh
 EOF
             fi
-            echo "http://mirrors.aliyun.com/alpine/latest-stable/main/" > $chrootp/etc/apk/repositories \
-            && echo "http://mirrors.aliyun.com/alpine/latest-stable/community/"  >> $chrootp/etc/apk/repositories
+            echo "http://mirrors.ustc.edu.cn/alpine/latest-stable/main/" > $chrootp/etc/apk/repositories \
+            && echo "http://mirrors.ustc.edu.cn/alpine/latest-stable/community/"  >> $chrootp/etc/apk/repositories
             cat << EOF >> $chrootp/etc/profile
 echo "Welcome to alpine $version chroot."
 echo "Create by PveTools."
@@ -3391,7 +3394,7 @@ $(for i in $dname;do echo $i ;done)  \
             cd ..
             git clone https://github.com/ivanhao/envytools
             cd envytools
-            apt-get install cmake flex libpciaccess-dev bison libx11-dev libxext-dev libxml2-dev libvdpau-dev python3-dev cython3 pkg-config
+            apt-get install cmake flex libpciaccess-dev bison libx11-dev libxext-dev libxml2-dev libvdpau-dev python3-dev cython3 pkg-config gcc g++
             cmake .
             make
             make install
